@@ -2,7 +2,9 @@
 # Make sure to check the documentation at http://goreleaser.com
 project_name: pgslice
 builds:
-- env:
+-
+  main: ./cmd/pgslice/main.go
+  env:
   - CGO_ENABLED=0
 archive:
   replacements:
