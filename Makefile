@@ -8,4 +8,4 @@ lint:
 		golint cmd/pgslice internal/app/pgslice
 
 release:
-		goreleaser
+		goreleaser --rm-dist
