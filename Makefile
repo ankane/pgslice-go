@@ -1,11 +1,11 @@
 install:
-		cd cmd/pgslice && go install
+	cd cmd/pgslice && go install
 
 test:
-		cd cmd/pgslice && go test
+	cd cmd/pgslice && go test
 
 lint:
-		golint cmd/pgslice internal/app/pgslice
+	golint cmd/pgslice internal/app/pgslice
 
 release:
-		goreleaser --rm-dist
+	goreleaser --rm-dist
