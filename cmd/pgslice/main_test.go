@@ -11,7 +11,7 @@ import (
 )
 
 func TestMain(m *testing.M) {
-	db, err := sql.Open("postgres", "postgres://localhost/pgslice_test")
+	db, err := sql.Open("postgres", "postgres://localhost/pgslice_test?sslmode=disable")
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -86,6 +86,6 @@ func AssertPeriod(t *testing.T, period string, triggerBased bool) {
 func RunCommand(command string) {
 	fmt.Println(fmt.Sprintf("pgslice %s", command))
 	fmt.Println("")
-	RunApp(strings.Split(fmt.Sprintf("pgslice %s --url %s", command, "postgres://localhost/pgslice_test"), " "))
+	RunApp(strings.Split(fmt.Sprintf("pgslice %s --url %s", command, "postgres://localhost/pgslice_test?sslmode=disable"), " "))
 	fmt.Println("")
 }
