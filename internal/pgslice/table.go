@@ -143,8 +143,8 @@ func (t Table) Columns(db *sql.DB) []string {
 }
 
 func (t Table) ForeignKeys(db *sql.DB) []string {
-	query := fmt.Sprintf("SELECT pg_get_constraintdef(oid) FROM pg_constraint WHERE conrelid = %s AND contype ='f'", t.Regclass())
-	rows, err := db.Query(query)
+	query := "SELECT pg_get_constraintdef(oid) FROM pg_constraint WHERE conrelid = $1::regclass AND contype ='f'"
+	rows, err := db.Query(query, QuoteTable(t))
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -252,7 +252,7 @@ func (t Table) PrimaryKey(db *sql.DB) []string {
 }
 
 func (t Table) IndexDefs(db *sql.DB) []string {
-	rows, err := db.Query(fmt.Sprintf("SELECT pg_get_indexdef(indexrelid) FROM pg_index WHERE indrelid = %s AND indisprimary = 'f'", t.Regclass()))
+	rows, err := db.Query("SELECT pg_get_indexdef(indexrelid) FROM pg_index WHERE indrelid = $1::regclass AND indisprimary = 'f'", QuoteTable(t))
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -272,7 +272,7 @@ func (t Table) IndexDefs(db *sql.DB) []string {
 
 func (t Table) FetchComment(db *sql.DB) string {
 	var comment string
-	err := db.QueryRow(fmt.Sprintf("SELECT COALESCE(obj_description(%s), '') AS comment", t.Regclass())).Scan(&comment)
+	err := db.QueryRow("SELECT COALESCE(obj_description($1::regclass), '') AS comment", QuoteTable(t)).Scan(&comment)
 	if err != nil {
 		if err == sql.ErrNoRows {
 			return ""
@@ -284,7 +284,7 @@ func (t Table) FetchComment(db *sql.DB) string {
 
 func (t Table) FetchTrigger(db *sql.DB, triggerName string) string {
 	var trigger string
-	err := db.QueryRow(fmt.Sprintf("SELECT obj_description(oid, 'pg_trigger') AS comment FROM pg_trigger WHERE tgname = $1 AND tgrelid = %s", t.Regclass()), triggerName).Scan(&trigger)
+	err := db.QueryRow("SELECT obj_description(oid, 'pg_trigger') AS comment FROM pg_trigger WHERE tgname = $1 AND tgrelid = $2::regclass", triggerName, QuoteTable(t)).Scan(&trigger)
 	if err != nil {
 		if err == sql.ErrNoRows {
 			return ""
@@ -292,8 +292,4 @@ func (t Table) FetchTrigger(db *sql.DB, triggerName string) string {
 		log.Fatal(err)
 	}
 	return trigger
-}
-
-func (t Table) Regclass() string {
-	return fmt.Sprintf("'%s'::regclass", QuoteTable(t))
 }
