@@ -4,7 +4,7 @@ install:
 	go install
 
 test:
-	go test -v
+	go test ./... -v
 
 lint:
 	staticcheck -checks "inherit,-ST1005" ./...
