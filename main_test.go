@@ -85,7 +85,7 @@ func AssertPeriod(t *testing.T, period string, triggerBased bool) {
 }
 
 func RunCommand(command string) {
-	fmt.Println(fmt.Sprintf("pgslice %s", command))
+	fmt.Printf("pgslice %s\n", command)
 	fmt.Println("")
 	RunApp(strings.Split(fmt.Sprintf("pgslice %s --url %s", command, "postgres://localhost/pgslice_test?sslmode=disable"), " "))
 	fmt.Println("")
