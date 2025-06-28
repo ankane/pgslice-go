@@ -2,9 +2,10 @@ package pgslice
 
 import (
 	"fmt"
-	"github.com/urfave/cli"
 	"math"
 	"time"
+
+	"github.com/urfave/cli"
 )
 
 func Fill(ctx *cli.Context) error {

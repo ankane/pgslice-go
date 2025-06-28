@@ -3,11 +3,12 @@ package main
 import (
 	"database/sql"
 	"fmt"
-	_ "github.com/lib/pq"
 	"log"
 	"os"
 	"strings"
 	"testing"
+
+	_ "github.com/lib/pq"
 )
 
 func TestMain(m *testing.M) {

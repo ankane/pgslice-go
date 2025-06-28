@@ -2,10 +2,11 @@ package pgslice
 
 import (
 	"fmt"
-	"github.com/urfave/cli"
 	"sort"
 	"strings"
 	"time"
+
+	"github.com/urfave/cli"
 )
 
 func AddPartitions(ctx *cli.Context) error {

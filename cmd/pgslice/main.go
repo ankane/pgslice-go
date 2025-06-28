@@ -1,10 +1,11 @@
 package main
 
 import (
-	"github.com/ankane/pgslice-go/internal/app/pgslice"
-	"github.com/urfave/cli"
 	"log"
 	"os"
+
+	"github.com/ankane/pgslice-go/internal/app/pgslice"
+	"github.com/urfave/cli"
 )
 
 func main() {

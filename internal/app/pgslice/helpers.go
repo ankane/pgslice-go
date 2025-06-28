@@ -3,13 +3,14 @@ package pgslice
 import (
 	"database/sql"
 	"fmt"
-	"github.com/lib/pq"
-	"github.com/urfave/cli"
 	"log"
 	"os"
 	"regexp"
 	"strings"
 	"time"
+
+	"github.com/lib/pq"
+	"github.com/urfave/cli"
 )
 
 func CreateTable(name string) Table {
