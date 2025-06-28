@@ -1,10 +1,11 @@
 package pgslice
 
 import (
+	"database/sql"
 	"fmt"
-	"github.com/jmoiron/sqlx"
 	"github.com/lib/pq"
 	"github.com/urfave/cli"
+	"log"
 	"os"
 	"regexp"
 	"strings"
@@ -21,17 +22,20 @@ func CreateTable(name string) Table {
 	return Table{Schema: schema, Name: name}
 }
 
-func Connection(ctx *cli.Context) (*sqlx.DB, error) {
+func Connection(ctx *cli.Context) (*sql.DB, error) {
 	url := ctx.String("url")
 	if url == "" {
 		url = os.Getenv("PGSLICE_URL")
 	}
-	return sqlx.Connect("postgres", url)
+	return sql.Open("postgres", url)
 }
 
-func ServerVersionNum(db *sqlx.DB) int {
+func ServerVersionNum(db *sql.DB) int {
 	var num int
-	db.Get(&num, "SHOW server_version_num")
+	err := db.QueryRow("SHOW server_version_num").Scan(&num)
+	if err != nil {
+		log.Fatal(err)
+	}
 	return num
 }
 
@@ -108,7 +112,7 @@ func Abort(message string) error {
 	return cli.NewExitError(message, 1)
 }
 
-func RunQueries(db *sqlx.DB, queries []string, ctx *cli.Context) error {
+func RunQueries(db *sql.DB, queries []string, ctx *cli.Context) error {
 	queries = append([]string{"BEGIN;"}, queries...)
 	queries = append(queries, "COMMIT;")
 	return RunQueriesWithoutTransaction(db, queries, ctx)
@@ -118,7 +122,7 @@ func LogSQL(s string) {
 	fmt.Println(s)
 }
 
-func RunQueriesWithoutTransaction(db *sqlx.DB, queries []string, ctx *cli.Context) error {
+func RunQueriesWithoutTransaction(db *sql.DB, queries []string, ctx *cli.Context) error {
 	for _, query := range queries {
 		err := RunQuery(db, query, ctx)
 		if err != nil {
@@ -128,7 +132,7 @@ func RunQueriesWithoutTransaction(db *sqlx.DB, queries []string, ctx *cli.Contex
 	return nil
 }
 
-func RunQuery(db *sqlx.DB, query string, ctx *cli.Context) error {
+func RunQuery(db *sql.DB, query string, ctx *cli.Context) error {
 	LogSQL(query)
 	LogSQL("")
 	if !ctx.Bool("dry-run") {
@@ -158,7 +162,7 @@ func PartitionDate(partition Table, nameFormat string) time.Time {
 	return day
 }
 
-func FetchSettings(db *sqlx.DB, originalTable Table, table Table) (string, string, string, bool) {
+func FetchSettings(db *sql.DB, originalTable Table, table Table) (string, string, string, bool) {
 	var field string
 	var period string
 	var cast string

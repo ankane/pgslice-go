@@ -3,7 +3,6 @@ package pgslice
 import (
 	"database/sql"
 	"fmt"
-	"github.com/jmoiron/sqlx"
 	"log"
 	"strings"
 	"time"
@@ -35,11 +34,11 @@ func (t Table) FullName() string {
 	return strings.Join([]string{t.Schema, t.Name}, ".")
 }
 
-func (t Table) Exists(db *sqlx.DB) bool {
+func (t Table) Exists(db *sql.DB) bool {
 	return len(t.ExistingTables(db, t.Name)) > 0
 }
 
-func (t Table) Sequences(db *sqlx.DB) []Sequence {
+func (t Table) Sequences(db *sql.DB) []Sequence {
 	query := `
 SELECT
   s.relname as name,
@@ -53,26 +52,45 @@ WHERE s.relkind = 'S'
   AND n.nspname = $1
   AND t.relname = $2
   `
-	sequences := []Sequence{}
-	err := db.Select(&sequences, query, t.Schema, t.Name)
+	rows, err := db.Query(query, t.Schema, t.Name)
 	if err != nil {
 		log.Fatal(err)
+	}
+	defer rows.Close()
+
+	sequences := []Sequence{}
+	for rows.Next() {
+		var s Sequence
+		err := rows.Scan(&s.Name, &s.Column)
+		if err != nil {
+			log.Fatal(err)
+		}
+		sequences = append(sequences, s)
 	}
 	return sequences
 }
 
-func (t Table) ExistingTables(db *sqlx.DB, like string) []Table {
+func (t Table) ExistingTables(db *sql.DB, like string) []Table {
 	query := "SELECT schemaname AS schema, tablename as name FROM pg_catalog.pg_tables WHERE schemaname = $1 AND tablename LIKE $2 ORDER BY 1, 2"
-
-	tables := []Table{}
-	err := db.Select(&tables, query, t.Schema, like)
+	rows, err := db.Query(query, t.Schema, like)
 	if err != nil {
 		log.Fatal(err)
+	}
+	defer rows.Close()
+
+	tables := []Table{}
+	for rows.Next() {
+		var t Table
+		err := rows.Scan(&t.Schema, &t.Name)
+		if err != nil {
+			log.Fatal(err)
+		}
+		tables = append(tables, t)
 	}
 	return tables
 }
 
-func (t Table) Partitions(db *sqlx.DB) []Table {
+func (t Table) Partitions(db *sql.DB) []Table {
 	query := `
 SELECT
   nmsp_child.nspname  AS schema,
@@ -86,38 +104,65 @@ WHERE
   nmsp_parent.nspname = $1 AND
   parent.relname = $2
   `
-
-	tables := []Table{}
-	err := db.Select(&tables, query, t.Schema, t.Name)
+	rows, err := db.Query(query, t.Schema, t.Name)
 	if err != nil {
 		log.Fatal(err)
+	}
+	defer rows.Close()
+
+	tables := []Table{}
+	for rows.Next() {
+		var t Table
+		err := rows.Scan(&t.Schema, &t.Name)
+		if err != nil {
+			log.Fatal(err)
+		}
+		tables = append(tables, t)
 	}
 	return tables
 }
 
-func (t Table) Columns(db *sqlx.DB) []string {
+func (t Table) Columns(db *sql.DB) []string {
 	query := "SELECT column_name FROM information_schema.columns WHERE table_schema = $1 AND table_name = $2"
-
-	keys := []string{}
-	err := db.Select(&keys, query, t.Schema, t.Name)
+	rows, err := db.Query(query, t.Schema, t.Name)
 	if err != nil {
 		log.Fatal(err)
+	}
+	defer rows.Close()
+
+	keys := []string{}
+	for rows.Next() {
+		var k string
+		err := rows.Scan(&k)
+		if err != nil {
+			log.Fatal(err)
+		}
+		keys = append(keys, k)
 	}
 	return keys
 }
 
-func (t Table) ForeignKeys(db *sqlx.DB) []string {
+func (t Table) ForeignKeys(db *sql.DB) []string {
 	query := fmt.Sprintf("SELECT pg_get_constraintdef(oid) FROM pg_constraint WHERE conrelid = %s AND contype ='f'", t.Regclass())
-
-	keys := []string{}
-	err := db.Select(&keys, query)
+	rows, err := db.Query(query)
 	if err != nil {
 		log.Fatal(err)
+	}
+	defer rows.Close()
+
+	keys := []string{}
+	for rows.Next() {
+		var k string
+		err := rows.Scan(&k)
+		if err != nil {
+			log.Fatal(err)
+		}
+		keys = append(keys, k)
 	}
 	return keys
 }
 
-func (t Table) MaxID(db *sqlx.DB, primaryKey string, where string, below int) int {
+func (t Table) MaxID(db *sql.DB, primaryKey string, where string, below int) int {
 	query := fmt.Sprintf("SELECT MAX(%s) FROM %s", QuoteIdent(primaryKey), QuoteTable(t))
 
 	conditions := []string{}
@@ -132,14 +177,14 @@ func (t Table) MaxID(db *sqlx.DB, primaryKey string, where string, below int) in
 	}
 
 	var max int
-	err := db.Get(&max, query)
+	err := db.QueryRow(query).Scan(&max)
 	if err != nil {
 		return 0
 	}
 	return max
 }
 
-func (t Table) MinID(db *sqlx.DB, primaryKey string, column string, cast string, startingTime time.Time, where string) int {
+func (t Table) MinID(db *sql.DB, primaryKey string, column string, cast string, startingTime time.Time, where string) int {
 	query := fmt.Sprintf("SELECT MIN(%s) FROM %s", QuoteIdent(primaryKey), QuoteTable(t))
 
 	conditions := []string{}
@@ -154,16 +199,16 @@ func (t Table) MinID(db *sqlx.DB, primaryKey string, column string, cast string,
 	}
 
 	var min int
-	err := db.Get(&min, query)
+	err := db.QueryRow(query).Scan(&min)
 	if err != nil {
 		return 1
 	}
 	return min
 }
 
-func (t Table) ColumnCast(db *sqlx.DB, column string) string {
+func (t Table) ColumnCast(db *sql.DB, column string) string {
 	var dataType string
-	err := db.Get(&dataType, "SELECT data_type FROM information_schema.columns WHERE table_schema = $1 AND table_name = $2 AND column_name = $3", t.Schema, t.Name, column)
+	err := db.QueryRow("SELECT data_type FROM information_schema.columns WHERE table_schema = $1 AND table_name = $2 AND column_name = $3", t.Schema, t.Name, column).Scan(&dataType)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -173,7 +218,7 @@ func (t Table) ColumnCast(db *sqlx.DB, column string) string {
 	return "date"
 }
 
-func (t Table) PrimaryKey(db *sqlx.DB) []string {
+func (t Table) PrimaryKey(db *sql.DB) []string {
 	query := `
     SELECT
       pg_attribute.attname
@@ -188,27 +233,46 @@ func (t Table) PrimaryKey(db *sqlx.DB) []string {
       pg_attribute.attnum = any(pg_index.indkey) AND
       indisprimary
   `
-
-	keys := []string{}
-	err := db.Select(&keys, query, t.Schema, t.Name)
+	rows, err := db.Query(query, t.Schema, t.Name)
 	if err != nil {
 		log.Fatal(err)
+	}
+	defer rows.Close()
+
+	keys := []string{}
+	for rows.Next() {
+		var k string
+		err := rows.Scan(&k)
+		if err != nil {
+			log.Fatal(err)
+		}
+		keys = append(keys, k)
 	}
 	return keys
 }
 
-func (t Table) IndexDefs(db *sqlx.DB) []string {
-	defs := []string{}
-	err := db.Select(&defs, fmt.Sprintf("SELECT pg_get_indexdef(indexrelid) FROM pg_index WHERE indrelid = %s AND indisprimary = 'f'", t.Regclass()))
+func (t Table) IndexDefs(db *sql.DB) []string {
+	rows, err := db.Query(fmt.Sprintf("SELECT pg_get_indexdef(indexrelid) FROM pg_index WHERE indrelid = %s AND indisprimary = 'f'", t.Regclass()))
 	if err != nil {
 		log.Fatal(err)
+	}
+	defer rows.Close()
+
+	defs := []string{}
+	for rows.Next() {
+		var k string
+		err := rows.Scan(&k)
+		if err != nil {
+			log.Fatal(err)
+		}
+		defs = append(defs, k)
 	}
 	return defs
 }
 
-func (t Table) FetchComment(db *sqlx.DB) string {
+func (t Table) FetchComment(db *sql.DB) string {
 	var comment string
-	err := db.Get(&comment, fmt.Sprintf("SELECT COALESCE(obj_description(%s), '') AS comment", t.Regclass()))
+	err := db.QueryRow(fmt.Sprintf("SELECT COALESCE(obj_description(%s), '') AS comment", t.Regclass())).Scan(&comment)
 	if err != nil {
 		if err == sql.ErrNoRows {
 			return ""
@@ -218,9 +282,9 @@ func (t Table) FetchComment(db *sqlx.DB) string {
 	return comment
 }
 
-func (t Table) FetchTrigger(db *sqlx.DB, triggerName string) string {
+func (t Table) FetchTrigger(db *sql.DB, triggerName string) string {
 	var trigger string
-	err := db.Get(&trigger, fmt.Sprintf("SELECT obj_description(oid, 'pg_trigger') AS comment FROM pg_trigger WHERE tgname = $1 AND tgrelid = %s", t.Regclass()), triggerName)
+	err := db.QueryRow(fmt.Sprintf("SELECT obj_description(oid, 'pg_trigger') AS comment FROM pg_trigger WHERE tgname = $1 AND tgrelid = %s", t.Regclass()), triggerName).Scan(&trigger)
 	if err != nil {
 		if err == sql.ErrNoRows {
 			return ""
