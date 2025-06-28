@@ -15,7 +15,7 @@ Download the client for your platform
 or use
 
 ```sh
-go install github.com/ankane/pgslice-go@latest
+go install github.com/ankane/pgslice-go@master
 ```
 
 Extract and run
