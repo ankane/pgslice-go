@@ -12,6 +12,12 @@ Download the client for your platform
 - [Mac](https://github.com/ankane/pgslice-go/releases/download/v0.1.0/pgslice_0.1.0_Darwin_x86_64.tar.gz)
 - [Windows](https://github.com/ankane/pgslice-go/releases/download/v0.1.0/pgslice_0.1.0_Windows_x86_64.tar.gz)
 
+or use
+
+```sh
+go install github.com/ankane/pgslice-go@latest
+```
+
 Extract and run
 
 ```sh

@@ -1,10 +1,10 @@
 .PHONY: install test lint format release snapshot
 
 install:
-	go install ./cmd/pgslice
+	go install
 
 test:
-	go test ./cmd/pgslice -v
+	go test -v
 
 lint:
 	staticcheck -checks "inherit,-ST1005" ./...
