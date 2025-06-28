@@ -1,15 +1,19 @@
+.PHONY: install test lint format release snapshot
+
 install:
-	cd cmd/pgslice && go install
+	go install
 
 test:
-	cd cmd/pgslice && go test
+	go test -v
 
 lint:
-	golint cmd/pgslice internal/app/pgslice
+	staticcheck -checks "inherit,-ST1005" ./...
 
 format:
-	cd cmd/pgslice && go fmt
-	cd internal/app/pgslice && go fmt
+	go fmt ./...
 
 release:
-	goreleaser --rm-dist
+	goreleaser --clean
+
+snapshot:
+	goreleaser --clean --snapshot
