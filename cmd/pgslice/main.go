@@ -4,7 +4,7 @@ import (
 	"log"
 	"os"
 
-	"github.com/ankane/pgslice-go/internal/app/pgslice"
+	"github.com/ankane/pgslice-go/internal/pgslice"
 	"github.com/urfave/cli"
 )
 
