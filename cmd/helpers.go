@@ -3,7 +3,6 @@ package cmd
 import (
 	"database/sql"
 	"fmt"
-	"log"
 	"os"
 	"regexp"
 	"strings"
@@ -31,13 +30,10 @@ func Connection(ctx *cli.Context) (*sql.DB, error) {
 	return sql.Open("postgres", url)
 }
 
-func ServerVersionNum(db *sql.DB) int {
+func ServerVersionNum(db *sql.DB) (int, error) {
 	var num int
 	err := db.QueryRow("SHOW server_version_num").Scan(&num)
-	if err != nil {
-		log.Fatal(err)
-	}
-	return num
+	return num, err
 }
 
 func QuoteTable(table Table) string {

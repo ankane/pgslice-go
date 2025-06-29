@@ -35,7 +35,12 @@ func Swap(ctx *cli.Context) error {
 		queries = append(queries, fmt.Sprintf("ALTER SEQUENCE %s OWNED BY %s.%s;", QuoteIdent(sequence.Name), QuoteTable(table), QuoteIdent(sequence.Column)))
 	}
 
-	if ServerVersionNum(db) >= 90300 {
+	serverVersionNum, err := ServerVersionNum(db)
+	if err != nil {
+		return err
+	}
+
+	if serverVersionNum >= 90300 {
 		queries = append([]string{fmt.Sprintf("SET LOCAL lock_timeout = '%s';", lockTimeout)}, queries...)
 	}
 

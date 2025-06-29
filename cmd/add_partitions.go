@@ -56,8 +56,14 @@ func AddPartitions(ctx *cli.Context) error {
 
 	// indexes automatically propagate in Postgres 11+
 	indexDefs := []string{}
-	if !declarative || ServerVersionNum(db) < 110000 {
-		indexDefs = schemaTable.IndexDefs(db)
+	if !declarative {
+		serverVersionNum, err := ServerVersionNum(db)
+		if err != nil {
+			return err
+		}
+		if serverVersionNum < 110000 {
+			indexDefs = schemaTable.IndexDefs(db)
+		}
 	}
 
 	fkDefs := schemaTable.ForeignKeys(db)

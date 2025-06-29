@@ -56,7 +56,10 @@ func Prep(ctx *cli.Context) error {
 
 	queries := []string{}
 
-	serverVersionNum := ServerVersionNum(db)
+	serverVersionNum, err := ServerVersionNum(db)
+	if err != nil {
+		return err
+	}
 
 	declarative := serverVersionNum >= 100000 && !triggerBased
 
