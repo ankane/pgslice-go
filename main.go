@@ -1,7 +1,7 @@
 package main
 
-import "github.com/ankane/pgslice-go/internal/pgslice"
+import "github.com/ankane/pgslice-go/cmd"
 
 func main() {
-	pgslice.Execute()
+	cmd.Execute()
 }

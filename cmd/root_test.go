@@ -1,4 +1,4 @@
-package pgslice
+package cmd
 
 import (
 	"database/sql"
