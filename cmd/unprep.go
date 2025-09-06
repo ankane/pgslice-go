@@ -16,7 +16,11 @@ func Unprep(ctx *cli.Context) error {
 		return err
 	}
 
-	if !intermediateTable.Exists(db) {
+	exists, err := intermediateTable.Exists(db)
+	if err != nil {
+		return err
+	}
+	if !exists {
 		return Abort(fmt.Sprintf("Table not found: %s", intermediateTable.FullName()))
 	}
 

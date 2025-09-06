@@ -159,17 +159,23 @@ func PartitionDate(partition Table, nameFormat string) time.Time {
 	return day
 }
 
-func FetchSettings(db *sql.DB, originalTable Table, table Table) (string, string, string, bool) {
+func FetchSettings(db *sql.DB, originalTable Table, table Table) (string, string, string, bool, error) {
 	var field string
 	var period string
 	var cast string
 
 	triggerName := originalTable.TriggerName()
-	triggerComment := table.FetchTrigger(db, triggerName)
+	triggerComment, err := table.FetchTrigger(db, triggerName)
+	if err != nil {
+		return "", "", "", false, err
+	}
 
 	comment := triggerComment
 	if comment == "" {
-		comment = table.FetchComment(db)
+		comment, err = table.FetchComment(db)
+		if err != nil {
+			return "", "", "", false, err
+		}
 	}
 
 	if comment != "" {
@@ -184,5 +190,5 @@ func FetchSettings(db *sql.DB, originalTable Table, table Table) (string, string
 
 	declarative := triggerComment == ""
 
-	return period, field, cast, declarative
+	return period, field, cast, declarative, err
 }

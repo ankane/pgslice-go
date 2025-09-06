@@ -16,21 +16,38 @@ func Unswap(ctx *cli.Context) error {
 		return err
 	}
 
-	if !table.Exists(db) {
+	exists, err := table.Exists(db)
+	if err != nil {
+		return err
+	}
+	if !exists {
 		return Abort(fmt.Sprintf("Table not found: %s", table.FullName()))
 	}
 
-	if !retiredTable.Exists(db) {
+	exists, err = retiredTable.Exists(db)
+	if err != nil {
+		return err
+	}
+	if !exists {
 		return Abort(fmt.Sprintf("Table not found: %s", retiredTable.FullName()))
 	}
 
-	if intermediateTable.Exists(db) {
+	exists, err = intermediateTable.Exists(db)
+	if err != nil {
+		return err
+	}
+	if exists {
 		return Abort(fmt.Sprintf("Table already exists: %s", intermediateTable.FullName()))
 	}
 
 	queries := []string{fmt.Sprintf("ALTER TABLE %s RENAME TO %s;", QuoteTable(table), QuoteNoSchema(intermediateTable)), fmt.Sprintf("ALTER TABLE %s RENAME TO %s;", QuoteTable(retiredTable), QuoteNoSchema(table))}
 
-	for _, sequence := range table.Sequences(db) {
+	sequences, err := table.Sequences(db)
+	if err != nil {
+		return err
+	}
+
+	for _, sequence := range sequences {
 		queries = append(queries, fmt.Sprintf("ALTER SEQUENCE %s OWNED BY %s.%s;", QuoteIdent(sequence.Name), QuoteTable(table), QuoteIdent(sequence.Column)))
 	}
 

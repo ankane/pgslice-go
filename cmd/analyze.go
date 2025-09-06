@@ -20,7 +20,11 @@ func Analyze(ctx *cli.Context) error {
 		return err
 	}
 
-	analyzeList := append(table.Partitions(db), parentTable)
+	partitions, err := table.Partitions(db)
+	if err != nil {
+		return err
+	}
+	analyzeList := append(partitions, parentTable)
 
 	queries := make([]string, len(analyzeList))
 	for i, t := range analyzeList {

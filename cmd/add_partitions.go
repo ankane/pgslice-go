@@ -23,14 +23,22 @@ func AddPartitions(ctx *cli.Context) error {
 		return err
 	}
 
-	if !table.Exists(db) {
+	exists, err := table.Exists(db)
+	if err != nil {
+		return err
+	}
+	if !exists {
 		return Abort(fmt.Sprintf("Table not found: %s", table.FullName()))
 	}
 
 	future := ctx.Int("future")
 	past := ctx.Int("past")
 
-	period, field, cast, declarative := FetchSettings(db, originalTable, table)
+	period, field, cast, declarative, err := FetchSettings(db, originalTable, table)
+	if err != nil {
+		return err
+	}
+
 	if period == "" {
 		message := fmt.Sprintf("No settings found: %s", table.FullName())
 		if !ctx.Bool("intermediate") {
@@ -50,7 +58,10 @@ func AddPartitions(ctx *cli.Context) error {
 	} else if ctx.Bool("intermediate") {
 		schemaTable = originalTable
 	} else {
-		partitions := originalTable.Partitions(db)
+		partitions, err := originalTable.Partitions(db)
+		if err != nil {
+			return err
+		}
 		schemaTable = partitions[len(partitions)-1]
 	}
 
@@ -62,12 +73,22 @@ func AddPartitions(ctx *cli.Context) error {
 			return err
 		}
 		if serverVersionNum < 110000 {
-			indexDefs = schemaTable.IndexDefs(db)
+			indexDefs, err = schemaTable.IndexDefs(db)
+			if err != nil {
+				return err
+			}
 		}
 	}
 
-	fkDefs := schemaTable.ForeignKeys(db)
-	primaryKey := schemaTable.PrimaryKey(db)
+	fkDefs, err := schemaTable.ForeignKeys(db)
+	if err != nil {
+		return err
+	}
+
+	primaryKey, err := schemaTable.PrimaryKey(db)
+	if err != nil {
+		return err
+	}
 
 	addedPartitions := []Table{}
 
@@ -77,7 +98,11 @@ func AddPartitions(ctx *cli.Context) error {
 		nameFormat := day.Format(NameFormat(period))
 		partition := Table{Schema: originalTable.Schema, Name: fmt.Sprintf("%s_%s", originalTable.Name, nameFormat)}
 		// TODO use partitions
-		if partition.Exists(db) {
+		exists, err := partition.Exists(db)
+		if err != nil {
+			return err
+		}
+		if exists {
 			continue
 		}
 		addedPartitions = append(addedPartitions, partition)
@@ -109,7 +134,11 @@ func AddPartitions(ctx *cli.Context) error {
 		futureDefs := []string{}
 		pastDefs := []string{}
 		nameFormat := NameFormat(period)
-		partitions := append(originalTable.Partitions(db), addedPartitions...)
+		partitions, err := originalTable.Partitions(db)
+		if err != nil {
+			return err
+		}
+		partitions = append(partitions, addedPartitions...)
 
 		sort.Slice(partitions, func(i, j int) bool {
 			return partitions[i].Name < partitions[j].Name

@@ -31,11 +31,19 @@ func Prep(ctx *cli.Context) error {
 		}
 	}
 
-	if !table.Exists(db) {
+	tableExists, err := table.Exists(db)
+	if err != nil {
+		return err
+	}
+	if !tableExists {
 		return Abort(fmt.Sprintf("Table not found: %s", table.FullName()))
 	}
 
-	if intermediateTable.Exists(db) {
+	intermediateTableExists, err := intermediateTable.Exists(db)
+	if err != nil {
+		return err
+	}
+	if intermediateTableExists {
 		return Abort(fmt.Sprintf("Table already exists: %s", intermediateTable.FullName()))
 	}
 
@@ -44,7 +52,12 @@ func Prep(ctx *cli.Context) error {
 			return Abort("Usage: pgslice prep TABLE COLUMN PERIOD")
 		}
 
-		if !Contains(table.Columns(db), column) {
+		columns, err := table.Columns(db)
+		if err != nil {
+			return err
+		}
+
+		if !Contains(columns, column) {
 			return Abort(fmt.Sprintf("Column not found: %s", column))
 		}
 
@@ -69,7 +82,10 @@ func Prep(ctx *cli.Context) error {
 		queries = append(queries, fmt.Sprintf("CREATE TABLE %s (LIKE %s INCLUDING DEFAULTS INCLUDING CONSTRAINTS INCLUDING STORAGE INCLUDING COMMENTS) PARTITION BY RANGE (%s);", QuoteTable(intermediateTable), QuoteTable(table), QuoteIdent(column)))
 
 		if serverVersionNum >= 110000 {
-			indexDefs = table.IndexDefs(db)
+			indexDefs, err = table.IndexDefs(db)
+			if err != nil {
+				return err
+			}
 
 			for _, def := range indexDefs {
 				queries = append(queries, MakeIndexDef(def, intermediateTable))
@@ -77,12 +93,20 @@ func Prep(ctx *cli.Context) error {
 		}
 
 		// add comment
-		cast := table.ColumnCast(db, column)
+		cast, err := table.ColumnCast(db, column)
+		if err != nil {
+			return err
+		}
 		queries = append(queries, fmt.Sprintf("COMMENT ON TABLE %s is 'column:%s,period:%s,cast:%s';", QuoteTable(intermediateTable), column, period, cast))
 	} else {
 		queries = append(queries, fmt.Sprintf("CREATE TABLE %s (LIKE %s INCLUDING ALL);", QuoteTable(intermediateTable), QuoteTable(table)))
 
-		for _, def := range table.ForeignKeys(db) {
+		foreignKeys, err := table.ForeignKeys(db)
+		if err != nil {
+			return err
+		}
+
+		for _, def := range foreignKeys {
 			queries = append(queries, MakeFkDef(def, intermediateTable))
 		}
 	}
@@ -99,7 +123,10 @@ func Prep(ctx *cli.Context) error {
     BEFORE INSERT ON %s
     FOR EACH ROW EXECUTE PROCEDURE %s();`, QuoteIdent(triggerName), QuoteTable(intermediateTable), QuoteIdent(triggerName)))
 
-		cast := table.ColumnCast(db, column)
+		cast, err := table.ColumnCast(db, column)
+		if err != nil {
+			return err
+		}
 
 		queries = append(queries, fmt.Sprintf("COMMENT ON TRIGGER %s ON %s IS 'column:%s,period:%s,cast:%s';", QuoteIdent(triggerName), QuoteTable(intermediateTable), column, period, cast))
 	}

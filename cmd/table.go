@@ -3,7 +3,6 @@ package cmd
 import (
 	"database/sql"
 	"fmt"
-	"log"
 	"strings"
 	"time"
 )
@@ -34,11 +33,15 @@ func (t Table) FullName() string {
 	return strings.Join([]string{t.Schema, t.Name}, ".")
 }
 
-func (t Table) Exists(db *sql.DB) bool {
-	return len(t.ExistingTables(db, t.Name)) > 0
+func (t Table) Exists(db *sql.DB) (bool, error) {
+	tables, err := t.ExistingTables(db, t.Name)
+	if err != nil {
+		return false, err
+	}
+	return len(tables) > 0, nil
 }
 
-func (t Table) Sequences(db *sql.DB) []Sequence {
+func (t Table) Sequences(db *sql.DB) ([]Sequence, error) {
 	query := `
 SELECT
   s.relname as name,
@@ -54,7 +57,7 @@ WHERE s.relkind = 'S'
   `
 	rows, err := db.Query(query, t.Schema, t.Name)
 	if err != nil {
-		log.Fatal(err)
+		return nil, err
 	}
 	defer rows.Close()
 
@@ -63,18 +66,18 @@ WHERE s.relkind = 'S'
 		var s Sequence
 		err := rows.Scan(&s.Name, &s.Column)
 		if err != nil {
-			log.Fatal(err)
+			return nil, err
 		}
 		sequences = append(sequences, s)
 	}
-	return sequences
+	return sequences, nil
 }
 
-func (t Table) ExistingTables(db *sql.DB, like string) []Table {
+func (t Table) ExistingTables(db *sql.DB, like string) ([]Table, error) {
 	query := "SELECT schemaname AS schema, tablename as name FROM pg_catalog.pg_tables WHERE schemaname = $1 AND tablename LIKE $2 ORDER BY 1, 2"
 	rows, err := db.Query(query, t.Schema, like)
 	if err != nil {
-		log.Fatal(err)
+		return nil, err
 	}
 	defer rows.Close()
 
@@ -83,14 +86,14 @@ func (t Table) ExistingTables(db *sql.DB, like string) []Table {
 		var t Table
 		err := rows.Scan(&t.Schema, &t.Name)
 		if err != nil {
-			log.Fatal(err)
+			return nil, err
 		}
 		tables = append(tables, t)
 	}
-	return tables
+	return tables, nil
 }
 
-func (t Table) Partitions(db *sql.DB) []Table {
+func (t Table) Partitions(db *sql.DB) ([]Table, error) {
 	query := `
 SELECT
   nmsp_child.nspname  AS schema,
@@ -106,7 +109,7 @@ WHERE
   `
 	rows, err := db.Query(query, t.Schema, t.Name)
 	if err != nil {
-		log.Fatal(err)
+		return nil, err
 	}
 	defer rows.Close()
 
@@ -115,18 +118,18 @@ WHERE
 		var t Table
 		err := rows.Scan(&t.Schema, &t.Name)
 		if err != nil {
-			log.Fatal(err)
+			return nil, err
 		}
 		tables = append(tables, t)
 	}
-	return tables
+	return tables, nil
 }
 
-func (t Table) Columns(db *sql.DB) []string {
+func (t Table) Columns(db *sql.DB) ([]string, error) {
 	query := "SELECT column_name FROM information_schema.columns WHERE table_schema = $1 AND table_name = $2"
 	rows, err := db.Query(query, t.Schema, t.Name)
 	if err != nil {
-		log.Fatal(err)
+		return nil, err
 	}
 	defer rows.Close()
 
@@ -135,18 +138,18 @@ func (t Table) Columns(db *sql.DB) []string {
 		var k string
 		err := rows.Scan(&k)
 		if err != nil {
-			log.Fatal(err)
+			return nil, err
 		}
 		keys = append(keys, k)
 	}
-	return keys
+	return keys, nil
 }
 
-func (t Table) ForeignKeys(db *sql.DB) []string {
+func (t Table) ForeignKeys(db *sql.DB) ([]string, error) {
 	query := "SELECT pg_get_constraintdef(oid) FROM pg_constraint WHERE conrelid = $1::regclass AND contype ='f'"
 	rows, err := db.Query(query, QuoteTable(t))
 	if err != nil {
-		log.Fatal(err)
+		return nil, err
 	}
 	defer rows.Close()
 
@@ -155,11 +158,11 @@ func (t Table) ForeignKeys(db *sql.DB) []string {
 		var k string
 		err := rows.Scan(&k)
 		if err != nil {
-			log.Fatal(err)
+			return nil, err
 		}
 		keys = append(keys, k)
 	}
-	return keys
+	return keys, nil
 }
 
 func (t Table) MaxID(db *sql.DB, primaryKey string, where string, below int) int {
@@ -206,19 +209,19 @@ func (t Table) MinID(db *sql.DB, primaryKey string, column string, cast string, 
 	return min
 }
 
-func (t Table) ColumnCast(db *sql.DB, column string) string {
+func (t Table) ColumnCast(db *sql.DB, column string) (string, error) {
 	var dataType string
 	err := db.QueryRow("SELECT data_type FROM information_schema.columns WHERE table_schema = $1 AND table_name = $2 AND column_name = $3", t.Schema, t.Name, column).Scan(&dataType)
 	if err != nil {
-		log.Fatal(err)
+		return "", err
 	}
 	if dataType == "timestamp with time zone" {
-		return "timestamptz"
+		return "timestamptz", nil
 	}
-	return "date"
+	return "date", nil
 }
 
-func (t Table) PrimaryKey(db *sql.DB) []string {
+func (t Table) PrimaryKey(db *sql.DB) ([]string, error) {
 	query := `
     SELECT
       pg_attribute.attname
@@ -235,7 +238,7 @@ func (t Table) PrimaryKey(db *sql.DB) []string {
   `
 	rows, err := db.Query(query, t.Schema, t.Name)
 	if err != nil {
-		log.Fatal(err)
+		return nil, err
 	}
 	defer rows.Close()
 
@@ -244,17 +247,17 @@ func (t Table) PrimaryKey(db *sql.DB) []string {
 		var k string
 		err := rows.Scan(&k)
 		if err != nil {
-			log.Fatal(err)
+			return nil, err
 		}
 		keys = append(keys, k)
 	}
-	return keys
+	return keys, nil
 }
 
-func (t Table) IndexDefs(db *sql.DB) []string {
+func (t Table) IndexDefs(db *sql.DB) ([]string, error) {
 	rows, err := db.Query("SELECT pg_get_indexdef(indexrelid) FROM pg_index WHERE indrelid = $1::regclass AND indisprimary = 'f'", QuoteTable(t))
 	if err != nil {
-		log.Fatal(err)
+		return nil, err
 	}
 	defer rows.Close()
 
@@ -263,33 +266,33 @@ func (t Table) IndexDefs(db *sql.DB) []string {
 		var k string
 		err := rows.Scan(&k)
 		if err != nil {
-			log.Fatal(err)
+			return nil, err
 		}
 		defs = append(defs, k)
 	}
-	return defs
+	return defs, nil
 }
 
-func (t Table) FetchComment(db *sql.DB) string {
+func (t Table) FetchComment(db *sql.DB) (string, error) {
 	var comment string
 	err := db.QueryRow("SELECT COALESCE(obj_description($1::regclass), '') AS comment", QuoteTable(t)).Scan(&comment)
 	if err != nil {
 		if err == sql.ErrNoRows {
-			return ""
+			return "", nil
 		}
-		log.Fatal(err)
+		return "", err
 	}
-	return comment
+	return comment, nil
 }
 
-func (t Table) FetchTrigger(db *sql.DB, triggerName string) string {
+func (t Table) FetchTrigger(db *sql.DB, triggerName string) (string, error) {
 	var trigger string
 	err := db.QueryRow("SELECT obj_description(oid, 'pg_trigger') AS comment FROM pg_trigger WHERE tgname = $1 AND tgrelid = $2::regclass", triggerName, QuoteTable(t)).Scan(&trigger)
 	if err != nil {
 		if err == sql.ErrNoRows {
-			return ""
+			return "", nil
 		}
-		log.Fatal(err)
+		return "", err
 	}
-	return trigger
+	return trigger, nil
 }

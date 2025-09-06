@@ -43,15 +43,26 @@ func Fill(ctx *cli.Context) error {
 		return err
 	}
 
-	if !sourceTable.Exists(db) {
+	sourceExists, err := sourceTable.Exists(db)
+	if err != nil {
+		return err
+	}
+	if !sourceExists {
 		return Abort(fmt.Sprintf("Table not found: %s", sourceTable.FullName()))
 	}
 
-	if !destTable.Exists(db) {
+	destExists, err := destTable.Exists(db)
+	if err != nil {
+		return err
+	}
+	if !destExists {
 		return Abort(fmt.Sprintf("Table not found: %s", destTable.FullName()))
 	}
 
-	period, field, cast, declarative := FetchSettings(db, table, destTable)
+	period, field, cast, declarative, err := FetchSettings(db, table, destTable)
+	if err != nil {
+		return err
+	}
 
 	var startingTime time.Time
 	var endingTime time.Time
@@ -59,7 +70,11 @@ func Fill(ctx *cli.Context) error {
 		nameFormat := NameFormat(period)
 
 		// TODO add period
-		partitions := table.Partitions(db)
+		partitions, err := table.Partitions(db)
+		if err != nil {
+			return err
+		}
+
 		if len(partitions) > 0 {
 			startingTime = PartitionDate(partitions[0], nameFormat)
 			endingTime = AdvanceDate(PartitionDate(partitions[len(partitions)-1], nameFormat), period, 1)
@@ -68,14 +83,22 @@ func Fill(ctx *cli.Context) error {
 
 	schemaTable := table
 	if period != "" && declarative {
-		partitions := destTable.Partitions(db)
+		partitions, err := destTable.Partitions(db)
+		if err != nil {
+			return err
+		}
+
 		if len(partitions) == 0 {
 			return Abort("No partitions")
 		}
 		schemaTable = partitions[len(partitions)-1]
 	}
 
-	primaryKey := schemaTable.PrimaryKey(db)
+	primaryKey, err := schemaTable.PrimaryKey(db)
+	if err != nil {
+		return err
+	}
+
 	if len(primaryKey) == 0 {
 		return Abort("No primary key")
 	}
@@ -98,7 +121,11 @@ func Fill(ctx *cli.Context) error {
 	}
 
 	startingID := maxDestID
-	fields := QuoteColumns(sourceTable.Columns(db))
+	columns, err := sourceTable.Columns(db)
+	if err != nil {
+		return err
+	}
+	fields := QuoteColumns(columns)
 
 	batchSize := ctx.Int("batch-size")
 
